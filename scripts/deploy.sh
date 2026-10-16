@@ -27,12 +27,24 @@ cd "${TARGET_DIR}"
 mkdir -p data
 
 echo "=== Installing Dependencies ==="
+if ! command -v pnpm &> /dev/null && command -v npm &> /dev/null; then
+  echo "Installing pnpm..."
+  npm install -g pnpm 2>/dev/null || true
+fi
+
 if command -v pnpm &> /dev/null; then
-  pnpm install --frozen-lockfile --prod
+  pnpm install --frozen-lockfile
 elif command -v npm &> /dev/null; then
-  npm install --omit=dev
+  npm install
 else
   echo "Warning: neither pnpm nor npm found in PATH!"
+fi
+
+echo "=== Building Production Assets ==="
+if command -v pnpm &> /dev/null; then
+  pnpm run build
+elif command -v npm &> /dev/null; then
+  npm run build
 fi
 
 echo "=== Checking PM2 ==="

@@ -4,14 +4,22 @@
   "description": "Real-time Lead-Lag Oracle Arbitrage, Fair-Value Probability Engine & Auto-Trader for Polymarket BTC Up or Down 5m Markets",
   "type": "module",
   "scripts": {
+    "build": "vite build",
     "start": "node --env-file-if-exists=.env src/server.ts",
-    "dev": "node --watch --env-file-if-exists=.env src/server.ts"
+    "dev": "node --watch --env-file-if-exists=.env src/server.ts",
+    "dev:client": "vite"
   },
   "engines": {
     "node": ">=22.6.0"
   },
   "dependencies": {
     "@polymarket/clob-client": "^5.8.1",
-    "@polymarket/real-time-data-client": "^1.4.0"
+    "@polymarket/real-time-data-client": "^1.4.0",
+    "lightweight-charts": "^5.2.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.4"
   }
 }

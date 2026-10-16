@@ -9,7 +9,8 @@ import { PolymarketSdkService } from './sdk/polymarketSdk.ts';
 import type { PriceChartPoint, QuantSignal } from './types.ts';
 
 const PORT = Number(process.env.PORT || 3000);
-const PUBLIC_DIR = path.join(process.cwd(), 'public');
+const DIST_DIR = path.join(process.cwd(), 'dist');
+const STATIC_DIR = fs.existsSync(DIST_DIR) ? DIST_DIR : path.join(process.cwd(), 'public');
 
 const polymarketSdk = new PolymarketSdkService();
 const priceFeeds = new PriceFeedManager();
@@ -327,17 +328,22 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Static files in /public
+  // Static files in /dist or /public
   let filePath = url.pathname === '/' ? '/index.html' : url.pathname;
   const safePath = path.normalize(filePath).replace(/^(\.\.[/\\])+/, '');
-  const absPath = path.join(PUBLIC_DIR, safePath);
+  const absPath = path.join(STATIC_DIR, safePath);
 
   if (fs.existsSync(absPath) && fs.statSync(absPath).isFile()) {
     const ext = path.extname(absPath);
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+    const isHashedAsset = safePath.startsWith('assets/') || safePath.startsWith('/assets/');
+    const cacheControl = isHashedAsset
+      ? 'public, max-age=31536000, immutable'
+      : 'no-cache, no-store, must-revalidate';
+
     res.writeHead(200, {
       'Content-Type': contentType,
-      'Cache-Control': 'no-cache, must-revalidate',
+      'Cache-Control': cacheControl,
     });
     fs.createReadStream(absPath).pipe(res);
   } else {
