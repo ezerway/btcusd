@@ -4,6 +4,7 @@ let appState = {
   sdkAuth: null,
   polymarket5mPrice: null,
   chartSeries: [],
+  windowHistory: [],
 };
 
 let chartHoverX = null;
@@ -159,9 +160,12 @@ function updateUI() {
   const curPolySpot = signal.polymarketSpotPrice || signal.fastMidPrice;
   const curFast = signal.fastMidPrice;
 
-  document.getElementById('chainlinkPriceVal').textContent = fmtUsd(curChainlink);
-  document.getElementById('twap60sVal').textContent = fmtUsd(signal.twap60sPrice || curChainlink);
-  document.getElementById('projectedOracleVal').textContent = fmtUsd(signal.projectedOraclePrice);
+  const clEl = document.getElementById('chainlinkPriceVal');
+  if (clEl) clEl.textContent = fmtUsd(curChainlink);
+  const twapEl = document.getElementById('twap60sVal');
+  if (twapEl) twapEl.textContent = fmtUsd(signal.twap60sPrice || curChainlink);
+  const projEl = document.getElementById('projectedOracleVal');
+  if (projEl) projEl.textContent = fmtUsd(signal.projectedOraclePrice);
 
   const distBadge = document.getElementById('distanceBadge');
   distBadge.textContent = fmtSignedUsd(signal.distanceToStrikeUsd);
@@ -205,74 +209,303 @@ function updateUI() {
   drawChart();
 }
 
-function drawPriceTag(ctx, x, y, width, text, bgColor, textColor = '#080b11') {
-  const h = 17;
-  const r = 4;
-  const top = Math.round(y - h / 2);
-  ctx.save();
-  ctx.fillStyle = bgColor;
-  ctx.beginPath();
-  ctx.roundRect(x, top, width, h, r);
-  ctx.fill();
+let chart = null;
+let primaryBaselineSeries = null;
+let polySpotSeries = null;
+let fastSeries = null;
+let strikePriceLine = null;
+let seriesMarkersPlugin = null;
+let currentChartMode = 'baseline'; // 'baseline' | 'delta' | 'price'
 
-  ctx.fillStyle = textColor;
-  ctx.font = 'bold 10px "JetBrains Mono", Menlo, monospace';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, x + 5, y);
-  ctx.restore();
+function initLightweightChart() {
+  const container = document.getElementById('priceChartContainer');
+  if (!container || typeof LightweightCharts === 'undefined') return;
+
+  if (chart) {
+    try { chart.remove(); } catch {}
+    chart = null;
+    seriesMarkersPlugin = null;
+    strikePriceLine = null;
+  }
+
+  chart = LightweightCharts.createChart(container, {
+    width: container.clientWidth || 600,
+    height: container.clientHeight || 320,
+    layout: {
+      background: { color: '#080b11' },
+      textColor: '#94a3b8',
+      fontFamily: '"JetBrains Mono", Menlo, Consolas, monospace',
+      fontSize: 11,
+    },
+    grid: {
+      vertLines: { color: 'rgba(40, 53, 77, 0.4)' },
+      horzLines: { color: 'rgba(40, 53, 77, 0.4)' },
+    },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode ? LightweightCharts.CrosshairMode.Normal : 1,
+      vertLine: {
+        color: 'rgba(148, 163, 184, 0.6)',
+        width: 1,
+        style: 3,
+        labelBackgroundColor: '#1e293b',
+      },
+      horzLine: {
+        color: 'rgba(148, 163, 184, 0.6)',
+        width: 1,
+        style: 3,
+        labelBackgroundColor: '#1e293b',
+      },
+    },
+    rightPriceScale: {
+      borderColor: '#28354d',
+      scaleMargins: {
+        top: 0.14,
+        bottom: 0.14,
+      },
+      autoScale: true,
+    },
+    timeScale: {
+      borderColor: '#28354d',
+      timeVisible: true,
+      secondsVisible: true,
+      fixLeftEdge: true,
+      fixRightEdge: true,
+    },
+    handleScroll: {
+      vertTouchDrag: false,
+    },
+  });
+
+  const addSeries = (type, options) => {
+    if (chart.addSeries && LightweightCharts[type]) {
+      return chart.addSeries(LightweightCharts[type], options);
+    }
+    if (type === 'BaselineSeries' && chart.addBaselineSeries) return chart.addBaselineSeries(options);
+    if (type === 'AreaSeries' && chart.addAreaSeries) return chart.addAreaSeries(options);
+    if (type === 'LineSeries' && chart.addLineSeries) return chart.addLineSeries(options);
+    return null;
+  };
+
+  // Primary Series: Baseline Series for #1 Chainlink with binary win/loss shading
+  primaryBaselineSeries = addSeries('BaselineSeries', {
+    baseValue: { type: 'price', price: 0 },
+    baseLineVisible: true,
+    baseLineColor: '#c084fc',
+    baseLineWidth: 2,
+    baseLineStyle: LightweightCharts.LineStyle ? LightweightCharts.LineStyle.Dashed : 2,
+    topLineColor: '#10b981',
+    topFillColor1: 'rgba(16, 185, 129, 0.32)',
+    topFillColor2: 'rgba(16, 185, 129, 0.04)',
+    bottomLineColor: '#f43f5e',
+    bottomFillColor1: 'rgba(244, 63, 94, 0.04)',
+    bottomFillColor2: 'rgba(244, 63, 94, 0.32)',
+    lineWidth: 2.5,
+    priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+    title: '#1 Chainlink',
+  });
+
+  // #2 Polymarket Spot Line (Blue)
+  polySpotSeries = addSeries('LineSeries', {
+    color: '#3b82f6',
+    lineWidth: 1.8,
+    priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+    title: '#2 Poly Spot',
+  });
+
+  // #3 Fast Exchange Lead Line (Cyan)
+  fastSeries = addSeries('LineSeries', {
+    color: '#06b6d4',
+    lineWidth: 2,
+    priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+    title: '#3 Fast Exch',
+  });
+
+  // Hover Tooltip / Header Sync
+  chart.subscribeCrosshairMove((param) => {
+    const subtitleEl = document.getElementById('chartSummarySub');
+    if (!subtitleEl) return;
+
+    if (
+      !param.time ||
+      param.point === undefined ||
+      param.point.x < 0 ||
+      param.point.x > container.clientWidth ||
+      param.point.y < 0 ||
+      param.point.y > container.clientHeight
+    ) {
+      updateChartHeaderSummary();
+      return;
+    }
+
+    const market = appState.market;
+    const strike = market ? market.strikePrice : null;
+    const clData = primaryBaselineSeries && param.seriesData ? param.seriesData.get(primaryBaselineSeries) : null;
+    const plData = polySpotSeries && param.seriesData ? param.seriesData.get(polySpotSeries) : null;
+    const fsData = fastSeries && param.seriesData ? param.seriesData.get(fastSeries) : null;
+
+    const clVal = clData ? (typeof clData.value === 'number' ? clData.value : clData.close) : null;
+    const plVal = plData ? (typeof plData.value === 'number' ? plData.value : plData.close) : null;
+    const fsVal = fsData ? (typeof fsData.value === 'number' ? fsData.value : fsData.close) : null;
+
+    if (currentChartMode === 'delta') {
+      let text = typeof strike === 'number' ? `Beat: ${fmtUsd(strike)}` : '';
+      if (typeof clVal === 'number') text += `  ·  #1 CL: ${fmtSignedUsd(clVal)}`;
+      if (typeof plVal === 'number') text += `  ·  #2 Poly: ${fmtSignedUsd(plVal)}`;
+      if (typeof fsVal === 'number') text += `  ·  #3 Fast: ${fmtSignedUsd(fsVal)}`;
+      subtitleEl.textContent = text || 'Live Ticks Active';
+    } else {
+      let text = typeof strike === 'number' ? `Beat: ${fmtUsd(strike)}` : '';
+      if (typeof clVal === 'number') text += `  ·  #1 CL ${fmtUsd(clVal)} (${typeof strike === 'number' ? fmtSignedUsd(clVal - strike) : ''})`;
+      if (typeof plVal === 'number') text += `  ·  #2 Poly ${fmtUsd(plVal)}`;
+      if (typeof fsVal === 'number') text += `  ·  #3 Fast ${fmtUsd(fsVal)}`;
+      subtitleEl.textContent = text || 'Live Ticks Active';
+    }
+  });
+
+  // Observe container resize for responsive sizing on mobile & desktop
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver((entries) => {
+      if (!entries.length || !chart) return;
+      const { width, height } = entries[0].contentRect;
+      if (width > 0 && height > 0) {
+        chart.applyOptions({ width, height });
+      }
+    });
+    ro.observe(container);
+  }
 }
 
-function drawChart() {
-  const canvas = document.getElementById('priceChartCanvas');
-  if (!canvas) return;
-
-  const rect = canvas.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  const targetW = Math.max(600, Math.floor(rect.width * dpr));
-  const targetH = Math.max(240, Math.floor(rect.height * dpr));
-  if (canvas.width !== targetW || canvas.height !== targetH) {
-    canvas.width = targetW;
-    canvas.height = targetH;
-  }
-
-  const ctx = canvas.getContext('2d');
-  ctx.save();
-  ctx.scale(dpr, dpr);
-
-  const w = rect.width || 1160;
-  const h = rect.height || 360;
-  ctx.clearRect(0, 0, w, h);
-
+function updateChartHeaderSummary() {
+  const subtitleEl = document.getElementById('chartSummarySub');
   const market = appState.market;
   const signal = appState.signal;
-  if (!market || !signal) {
-    ctx.restore();
-    return;
-  }
+  if (!subtitleEl || !market || !signal) return;
 
   const strike = market.strikePrice;
   const curOracle = signal.chainlinkPrice;
   const curPolySpot = signal.polymarketSpotPrice || signal.fastMidPrice;
   const curFast = signal.fastMidPrice;
 
-  const windowCutoff = (market.startTimeSec - 30) * 1000;
+  if (currentChartMode === 'delta') {
+    subtitleEl.textContent = `Beat: ${fmtUsd(strike)}  ·  #1 CL: ${fmtSignedUsd(curOracle - strike)}  ·  #3 Lead: ${fmtSignedUsd(curFast - strike)}`;
+  } else {
+    subtitleEl.textContent = `Beat: ${fmtUsd(strike)}  ·  #1 CL: ${fmtSignedUsd(curOracle - strike)}  ·  #3 Lead: ${fmtSignedUsd(curFast - strike)}`;
+  }
+}
+
+function updateChartLegendUI() {
+  const legend = document.getElementById('chartLegend');
+  if (!legend) return;
+
+  if (currentChartMode === 'delta') {
+    legend.innerHTML = `
+      <span class="inline-flex items-center gap-1.5 bg-[#1a2333] border border-[#28354d] px-2 py-0.5 rounded"><i class="inline-block w-2.5 h-1 rounded-sm bg-emerald-400"></i>UP (&gt; $0)</span>
+      <span class="inline-flex items-center gap-1.5 bg-[#1a2333] border border-[#28354d] px-2 py-0.5 rounded"><i class="inline-block w-2.5 h-1 rounded-sm bg-rose-500"></i>DOWN (&lt; $0)</span>
+      <span class="inline-flex items-center gap-1.5 bg-[#1a2333] border border-[#28354d] px-2 py-0.5 rounded"><i class="inline-block w-2.5 h-1 rounded-sm bg-cyan-400"></i>#3 Lead</span>
+      <span class="inline-flex items-center gap-1.5 bg-[#1a2333] border border-[#28354d] px-2 py-0.5 rounded"><i class="inline-block w-2.5 h-1 rounded-sm bg-purple-400"></i>Price to Beat</span>
+    `;
+  } else if (currentChartMode === 'price') {
+    legend.innerHTML = `
+      <span class="inline-flex items-center gap-1.5 bg-[#1a2333] border border-[#28354d] px-2 py-0.5 rounded"><i class="inline-block w-2.5 h-1 rounded-sm bg-emerald-400"></i>#1 Chainlink</span>
+      <span class="inline-flex items-center gap-1.5 bg-[#1a2333] border border-[#28354d] px-2 py-0.5 rounded"><i class="inline-block w-2.5 h-1 rounded-sm bg-blue-500"></i>#2 Poly Spot</span>
+      <span class="inline-flex items-center gap-1.5 bg-[#1a2333] border border-[#28354d] px-2 py-0.5 rounded"><i class="inline-block w-2.5 h-1 rounded-sm bg-cyan-400"></i>#3 Lead</span>
+      <span class="inline-flex items-center gap-1.5 bg-[#1a2333] border border-[#28354d] px-2 py-0.5 rounded"><i class="inline-block w-2.5 h-1 rounded-sm bg-purple-400"></i>Price to Beat</span>
+    `;
+  } else {
+    legend.innerHTML = `
+      <span class="inline-flex items-center gap-1.5 bg-[#1a2333] border border-[#28354d] px-2 py-0.5 rounded"><i class="inline-block w-2.5 h-1 rounded-sm bg-emerald-400"></i>UP</span>
+      <span class="inline-flex items-center gap-1.5 bg-[#1a2333] border border-[#28354d] px-2 py-0.5 rounded"><i class="inline-block w-2.5 h-1 rounded-sm bg-rose-500"></i>DOWN</span>
+      <span class="inline-flex items-center gap-1.5 bg-[#1a2333] border border-[#28354d] px-2 py-0.5 rounded"><i class="inline-block w-2.5 h-1 rounded-sm bg-cyan-400"></i>#3 Lead</span>
+      <span class="inline-flex items-center gap-1.5 bg-[#1a2333] border border-[#28354d] px-2 py-0.5 rounded"><i class="inline-block w-2.5 h-1 rounded-sm bg-purple-400"></i>Price to Beat</span>
+    `;
+  }
+}
+
+function setChartMode(mode) {
+  if (currentChartMode === mode) return;
+  currentChartMode = mode;
+
+  const buttons = document.querySelectorAll('.chart-mode-btn');
+  buttons.forEach((btn) => {
+    const isActive = btn.dataset.mode === mode;
+    btn.classList.toggle('active', isActive);
+    btn.classList.toggle('text-white', isActive);
+    btn.classList.toggle('bg-blue-600', isActive);
+    btn.classList.toggle('shadow-sm', isActive);
+    btn.classList.toggle('font-semibold', isActive);
+    btn.classList.toggle('text-slate-400', !isActive);
+    btn.classList.toggle('font-medium', !isActive);
+  });
+
+  updateChartLegendUI();
+  drawChart();
+}
+
+function applySeriesMarkers(series, markers) {
+  if (!series) return;
+  try {
+    if (!seriesMarkersPlugin && typeof LightweightCharts.createSeriesMarkers === 'function') {
+      seriesMarkersPlugin = LightweightCharts.createSeriesMarkers(series, markers);
+      return;
+    }
+    if (seriesMarkersPlugin && typeof seriesMarkersPlugin.setMarkers === 'function') {
+      seriesMarkersPlugin.setMarkers(markers);
+      return;
+    }
+    if (typeof series.setMarkers === 'function') {
+      series.setMarkers(markers);
+    }
+  } catch (err) {
+    console.warn('Could not set markers:', err);
+  }
+}
+
+function drawChart() {
+  if (!chart) {
+    initLightweightChart();
+    if (!chart) return;
+  }
+
+  const market = appState.market;
+  const signal = appState.signal;
+  if (!market || !signal) return;
+
+  const strike = market.strikePrice;
+  const curOracle = signal.chainlinkPrice;
+  const curPolySpot = signal.polymarketSpotPrice || signal.fastMidPrice;
+  const curFast = signal.fastMidPrice;
+
+  const isDelta = currentChartMode === 'delta';
+  const isPrice = currentChartMode === 'price';
+  const targetBasePrice = isDelta ? 0 : strike;
+  const linePrice = isDelta ? 0 : strike;
+  const lineTitle = isDelta ? 'BEAT ($0.00)' : `BEAT ${fmtUsd(strike)}`;
+
+  // Keep up to 35 minutes of continuous historical ticks across previous milestones
+  const nowMs = signal.timestamp || Date.now();
+  const maxHistoryMs = 35 * 60 * 1000;
+  const cutoffTs = nowMs - maxHistoryMs;
+
   const rawSeries = (appState.chartSeries || [])
     .filter(
       (pt) =>
         pt &&
-        pt.t >= windowCutoff &&
-        Math.abs(pt.oracle - curOracle) < 1000 &&
-        Math.abs(pt.fast - curFast) < 1000
+        typeof pt.t === 'number' &&
+        pt.t >= cutoffTs &&
+        typeof pt.oracle === 'number' &&
+        pt.oracle > 1000 &&
+        Math.abs(pt.oracle - curOracle) < 8000
     )
     .map((pt) => ({
       ...pt,
       polySpot: typeof pt.polySpot === 'number' && pt.polySpot > 1000 ? pt.polySpot : pt.fast,
+      strike: typeof pt.strike === 'number' && pt.strike > 1000 ? pt.strike : strike,
     }));
 
-  const series = [
+  const allPoints = [
     ...rawSeries,
     {
-      t: signal.timestamp || Date.now(),
+      t: nowMs,
       fast: curFast,
       polySpot: curPolySpot,
       oracle: curOracle,
@@ -280,305 +513,193 @@ function drawChart() {
     },
   ];
 
-  if (series.length === 1) {
-    series.unshift({
-      t: series[0].t - 2000,
-      fast: curFast,
-      polySpot: curPolySpot,
-      oracle: curOracle,
-      strike,
-    });
-  }
+  // Helper to deduplicate seconds and ensure strictly ascending timestamps
+  const prepareSeriesData = (key) => {
+    const list = [];
+    let lastSec = -1;
+    for (const pt of allPoints) {
+      if (!pt || typeof pt[key] !== 'number' || isNaN(pt[key])) continue;
+      const sec = Math.floor(pt.t / 1000);
+      let val = pt[key];
+      if (isDelta) {
+        val = val - (pt.strike || strike);
+      }
+      if (sec <= lastSec) {
+        if (list.length > 0 && sec === lastSec) {
+          list[list.length - 1].value = val;
+        }
+        continue;
+      }
+      list.push({ time: sec, value: val });
+      lastSec = sec;
+    }
+    return list;
+  };
 
-  const padLeft = 14;
-  const padRight = 112;
-  const padTop = 18;
-  const padBottom = 26;
-  const plotW = Math.max(100, w - padLeft - padRight);
-  const plotH = Math.max(80, h - padTop - padBottom);
+  const clData = prepareSeriesData('oracle');
+  const polyData = prepareSeriesData('polySpot');
+  const fastData = prepareSeriesData('fast');
 
-  let minP = strike;
-  let maxP = strike;
-  for (const pt of series) {
-    minP = Math.min(minP, pt.fast, pt.polySpot, pt.oracle);
-    maxP = Math.max(maxP, pt.fast, pt.polySpot, pt.oracle);
-  }
+  if (primaryBaselineSeries) primaryBaselineSeries.setData(clData);
+  if (polySpotSeries) polySpotSeries.setData(polyData);
+  if (fastSeries) fastSeries.setData(fastData);
 
-  const rawSpan = maxP - minP;
-  const minSpan = 28;
-  if (rawSpan < minSpan) {
-    const mid = (maxP + minP) / 2;
-    minP = mid - minSpan / 2;
-    maxP = mid + minSpan / 2;
-  } else {
-    const pad = rawSpan * 0.18;
-    minP -= pad;
-    maxP += pad;
-  }
+  // Configure Baseline appearance
+  if (primaryBaselineSeries) {
+    if (isPrice) {
+      primaryBaselineSeries.applyOptions({
+        baseValue: { type: 'price', price: targetBasePrice },
+        baseLineVisible: true,
+        baseLineColor: '#c084fc',
+        baseLineWidth: 2,
+        baseLineStyle: LightweightCharts.LineStyle ? LightweightCharts.LineStyle.Dashed : 2,
+        topLineColor: '#10b981',
+        bottomLineColor: '#10b981',
+        topFillColor1: 'rgba(16, 185, 129, 0.16)',
+        topFillColor2: 'rgba(16, 185, 129, 0.02)',
+        bottomFillColor1: 'rgba(16, 185, 129, 0.02)',
+        bottomFillColor2: 'rgba(16, 185, 129, 0.16)',
+      });
+    } else {
+      primaryBaselineSeries.applyOptions({
+        baseValue: { type: 'price', price: targetBasePrice },
+        baseLineVisible: true,
+        baseLineColor: '#c084fc',
+        baseLineWidth: 2,
+        baseLineStyle: LightweightCharts.LineStyle ? LightweightCharts.LineStyle.Dashed : 2,
+        topLineColor: '#10b981',
+        topFillColor1: 'rgba(16, 185, 129, 0.32)',
+        topFillColor2: 'rgba(16, 185, 129, 0.04)',
+        bottomLineColor: '#f43f5e',
+        bottomFillColor1: 'rgba(244, 63, 94, 0.04)',
+        bottomFillColor2: 'rgba(244, 63, 94, 0.32)',
+      });
+    }
 
-  const range = Math.max(1, maxP - minP);
-  const toY = (p) => padTop + (1 - (p - minP) / range) * plotH;
-  const toX = (i) => padLeft + (i / Math.max(1, series.length - 1)) * plotW;
-
-  const strikeY = toY(strike);
-  const clampedStrikeY = Math.max(padTop, Math.min(padTop + plotH, strikeY));
-
-  const subtitleEl = document.getElementById('chartSummarySub');
-  if (subtitleEl) {
-    subtitleEl.textContent = `Beat ${fmtUsd(strike)}  ·  #1 CL ${fmtSignedUsd(
-      curOracle - strike
-    )}  ·  #2 Poly ${fmtSignedUsd(curPolySpot - strike)}  ·  #3 Fast ${fmtSignedUsd(
-      curFast - strike
-    )}`;
-  }
-
-  // 1. UP (green) and DOWN (red) background tint
-  if (clampedStrikeY > padTop) {
-    const upGrad = ctx.createLinearGradient(0, padTop, 0, clampedStrikeY);
-    upGrad.addColorStop(0, 'rgba(16, 185, 129, 0.09)');
-    upGrad.addColorStop(1, 'rgba(16, 185, 129, 0.01)');
-    ctx.fillStyle = upGrad;
-    ctx.fillRect(padLeft, padTop, plotW, clampedStrikeY - padTop);
-  }
-  if (clampedStrikeY < padTop + plotH) {
-    const downGrad = ctx.createLinearGradient(0, clampedStrikeY, 0, padTop + plotH);
-    downGrad.addColorStop(0, 'rgba(244, 63, 94, 0.01)');
-    downGrad.addColorStop(1, 'rgba(244, 63, 94, 0.09)');
-    ctx.fillStyle = downGrad;
-    ctx.fillRect(padLeft, clampedStrikeY, plotW, padTop + plotH - clampedStrikeY);
-  }
-
-  // 2. Grid lines + price & delta labels
-  const gridSteps = 4;
-  ctx.font = '10px "JetBrains Mono", Menlo, monospace';
-  ctx.textBaseline = 'middle';
-  for (let i = 0; i <= gridSteps; i++) {
-    const p = maxP - (i / gridSteps) * range;
-    const y = toY(p);
-
-    ctx.strokeStyle = 'rgba(148, 163, 184, 0.12)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(padLeft, y);
-    ctx.lineTo(padLeft + plotW, y);
-    ctx.stroke();
-
-    const delta = p - strike;
-    const deltaStr = `${delta >= 0 ? '+' : '-'}$${Math.abs(delta).toFixed(0)}`;
-    ctx.fillStyle = 'rgba(148, 163, 184, 0.55)';
-    ctx.fillText(deltaStr, padLeft + 4, y - 7);
-    ctx.fillText(`$${p.toFixed(1)}`, padLeft + plotW + 6, y);
-  }
-
-  // 3. Shaded area between #1 Chainlink and Price to Beat
-  ctx.save();
-  ctx.beginPath();
-  series.forEach((pt, idx) => {
-    const x = toX(idx);
-    const y = toY(pt.oracle);
-    if (idx === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.lineTo(toX(series.length - 1), clampedStrikeY);
-  ctx.lineTo(toX(0), clampedStrikeY);
-  ctx.closePath();
-  ctx.fillStyle =
-    curOracle >= strike ? 'rgba(16, 185, 129, 0.16)' : 'rgba(244, 63, 94, 0.16)';
-  ctx.fill();
-  ctx.restore();
-
-  // 4. Price to Beat line
-  ctx.save();
-  ctx.strokeStyle = '#a855f7';
-  ctx.lineWidth = 1.75;
-  ctx.setLineDash([6, 4]);
-  ctx.beginPath();
-  ctx.moveTo(padLeft, strikeY);
-  ctx.lineTo(padLeft + plotW, strikeY);
-  ctx.stroke();
-  ctx.restore();
-
-  ctx.fillStyle = '#d8b4fe';
-  ctx.font = 'bold 10px "JetBrains Mono", Menlo, monospace';
-  ctx.fillText(`BEAT ${fmtUsd(strike)}`, padLeft + 44, strikeY - 6);
-
-  // 5. #1 Chainlink (Amber)
-  ctx.save();
-  ctx.strokeStyle = '#f59e0b';
-  ctx.lineWidth = 2.4;
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  series.forEach((pt, idx) => {
-    const x = toX(idx);
-    const y = toY(pt.oracle);
-    if (idx === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.stroke();
-  ctx.restore();
-
-  // 6. #2 Poly Spot (Blue)
-  ctx.save();
-  ctx.strokeStyle = '#3b82f6';
-  ctx.lineWidth = 1.9;
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  series.forEach((pt, idx) => {
-    const x = toX(idx);
-    const y = toY(pt.polySpot);
-    if (idx === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.stroke();
-  ctx.restore();
-
-  // 7. #3 Fast Exch (Cyan)
-  ctx.save();
-  ctx.strokeStyle = '#06b6d4';
-  ctx.lineWidth = 1.8;
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  series.forEach((pt, idx) => {
-    const x = toX(idx);
-    const y = toY(pt.fast);
-    if (idx === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.stroke();
-  ctx.restore();
-
-  // 8. End Dots + Right-Axis Callout Badges
-  const lastX = toX(series.length - 1);
-  const oracleY = toY(curOracle);
-  const polySpotY = toY(curPolySpot);
-  const fastY = toY(curFast);
-
-  ctx.fillStyle = '#f59e0b';
-  ctx.beginPath();
-  ctx.arc(lastX, oracleY, 4, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#3b82f6';
-  ctx.beginPath();
-  ctx.arc(lastX, polySpotY, 3.6, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#06b6d4';
-  ctx.beginPath();
-  ctx.arc(lastX, fastY, 3.4, 0, Math.PI * 2);
-  ctx.fill();
-
-  const tags = [
-    { y: strikeY, text: `BEAT ${strike.toFixed(1)}`, bg: '#a855f7', fg: '#ffffff' },
-    { y: oracleY, text: `#1 CL ${curOracle.toFixed(1)}`, bg: '#f59e0b', fg: '#080b11' },
-    { y: polySpotY, text: `#2 PL ${curPolySpot.toFixed(1)}`, bg: '#3b82f6', fg: '#ffffff' },
-    { y: fastY, text: `#3 FS ${curFast.toFixed(1)}`, bg: '#06b6d4', fg: '#080b11' },
-  ].sort((a, b) => a.y - b.y);
-
-  const minGap = 18;
-  for (let i = 1; i < tags.length; i++) {
-    if (tags[i].y - tags[i - 1].y < minGap) {
-      tags[i].y = tags[i - 1].y + minGap;
+    // Always maintain Price to Beat horizontal price line with prominent axis label
+    if (!strikePriceLine) {
+      try {
+        strikePriceLine = primaryBaselineSeries.createPriceLine({
+          price: linePrice,
+          color: '#c084fc',
+          lineWidth: 2,
+          lineStyle: LightweightCharts.LineStyle ? LightweightCharts.LineStyle.Dashed : 2,
+          axisLabelVisible: true,
+          title: lineTitle,
+        });
+      } catch (err) {
+        console.warn('Failed to create price line:', err);
+      }
+    } else {
+      try {
+        strikePriceLine.applyOptions({
+          price: linePrice,
+          color: '#c084fc',
+          lineWidth: 2,
+          lineStyle: LightweightCharts.LineStyle ? LightweightCharts.LineStyle.Dashed : 2,
+          axisLabelVisible: true,
+          title: lineTitle,
+        });
+      } catch (err) {
+        console.warn('Failed to update price line:', err);
+      }
     }
   }
-  for (const tag of tags) {
-    const clampedY = Math.max(padTop + 8, Math.min(padTop + plotH - 8, tag.y));
-    drawPriceTag(ctx, padLeft + plotW + 4, clampedY, padRight - 8, tag.text, tag.bg, tag.fg);
+
+  // Generate milestone markers for previous rounds and current round
+  const markers = [];
+  const history = appState.windowHistory || [];
+  const sortedHistory = [...history].sort((a, b) => a.windowStartSec - b.windowStartSec);
+
+  const findClosestTime = (targetSec) => {
+    if (!clData || !clData.length) return null;
+    let closest = null;
+    let minDiff = Infinity;
+    for (const pt of clData) {
+      const diff = Math.abs(pt.time - targetSec);
+      if (diff < minDiff && diff <= 35) {
+        minDiff = diff;
+        closest = pt.time;
+      }
+    }
+    return closest;
+  };
+
+  const usedTimes = new Set();
+
+  for (const item of sortedHistory) {
+    // 1. Previous Round Start Milestone
+    const startT = findClosestTime(item.windowStartSec);
+    if (startT && !usedTimes.has(startT)) {
+      usedTimes.add(startT);
+      markers.push({
+        time: startT,
+        position: 'aboveBar',
+        color: '#c084fc',
+        shape: 'circle',
+        text: `🎯 Beat ${fmtUsd(item.strikePrice, 0)}`,
+      });
+    }
+
+    // 2. Previous Round Resolution Milestone
+    const endT = findClosestTime(item.windowEndSec);
+    if (endT && !usedTimes.has(endT)) {
+      usedTimes.add(endT);
+      const isUp = item.winner === 'UP';
+      markers.push({
+        time: endT,
+        position: isUp ? 'belowBar' : 'aboveBar',
+        color: isUp ? '#10b981' : '#f43f5e',
+        shape: isUp ? 'arrowUp' : 'arrowDown',
+        text: `${isUp ? '🟢 UP' : '🔴 DOWN'} (${fmtSignedUsd(item.deltaUsd, 0)})`,
+      });
+    }
   }
 
-  // 9. X-Axis Timestamps
-  ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
-  ctx.font = '10px "JetBrains Mono", Menlo, monospace';
-  const timeTicks = Math.min(6, series.length);
-  for (let k = 0; k < timeTicks; k++) {
-    const idx = Math.floor((k / Math.max(1, timeTicks - 1)) * (series.length - 1));
-    const pt = series[idx];
-    const x = toX(idx);
-    const label =
-      k === timeTicks - 1
-        ? 'NOW'
-        : new Date(pt.t).toLocaleTimeString([], { minute: '2-digit', second: '2-digit' });
-    const alignOffset = k === 0 ? 0 : k === timeTicks - 1 ? -24 : -16;
-    ctx.fillText(label, x + alignOffset, h - 8);
+  // Current active round milestone
+  if (market && market.startTimeSec) {
+    const curStartT = findClosestTime(market.startTimeSec);
+    if (curStartT && !usedTimes.has(curStartT)) {
+      usedTimes.add(curStartT);
+      markers.push({
+        time: curStartT,
+        position: 'aboveBar',
+        color: '#a855f7',
+        shape: 'circle',
+        text: `🎯 Beat ${fmtUsd(market.strikePrice, 0)} (Live)`,
+      });
+    }
   }
 
-  // 10. Hover Crosshair & Tooltip
-  if (chartHoverX !== null && chartHoverX >= padLeft && chartHoverX <= padLeft + plotW) {
-    const ratio = (chartHoverX - padLeft) / plotW;
-    const hoverIdx = Math.max(
-      0,
-      Math.min(series.length - 1, Math.round(ratio * (series.length - 1)))
-    );
-    const pt = series[hoverIdx];
-    const hx = toX(hoverIdx);
-    const hyOracle = toY(pt.oracle);
+  // Sort markers in ascending order of time
+  markers.sort((a, b) => a.time - b.time);
 
-    ctx.save();
-    ctx.strokeStyle = 'rgba(248, 250, 252, 0.35)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath();
-    ctx.moveTo(hx, padTop);
-    ctx.lineTo(hx, padTop + plotH);
-    ctx.stroke();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(hx, hyOracle, 4.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    const diffOracle = pt.oracle - strike;
-    const diffPoly = pt.polySpot - strike;
-    const diffFast = pt.fast - strike;
-    const tStr = new Date(pt.t).toLocaleTimeString();
-    const lines = [
-      `Time: ${tStr}`,
-      `#1 CL:   ${fmtUsd(pt.oracle)} (${fmtSignedUsd(diffOracle)})`,
-      `#2 Poly: ${fmtUsd(pt.polySpot)} (${fmtSignedUsd(diffPoly)})`,
-      `#3 Fast: ${fmtUsd(pt.fast)} (${fmtSignedUsd(diffFast)})`,
-      `Beat:    ${fmtUsd(strike)}`,
-    ];
-
-    const boxW = 216;
-    const boxH = 82;
-    const boxX = hx + 12 + boxW > padLeft + plotW ? hx - boxW - 12 : hx + 12;
-    const boxY = Math.max(padTop + 4, Math.min(padTop + plotH - boxH - 4, hyOracle - boxH / 2));
-
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
-    ctx.strokeStyle = '#334155';
-    ctx.setLineDash([]);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(boxX, boxY, boxW, boxH, 6);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#f8fafc';
-    ctx.font = '10.5px "JetBrains Mono", Menlo, monospace';
-    lines.forEach((line, i) => {
-      ctx.fillText(line, boxX + 8, boxY + 13 + i * 14);
-    });
-    ctx.restore();
+  if (primaryBaselineSeries) {
+    applySeriesMarkers(primaryBaselineSeries, markers);
   }
 
-  ctx.restore();
+  updateChartHeaderSummary();
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  const canvas = document.getElementById('priceChartCanvas');
-  if (canvas) {
-    canvas.addEventListener('mousemove', (e) => {
-      const r = canvas.getBoundingClientRect();
-      chartHoverX = e.clientX - r.left;
-      drawChart();
-    });
-    canvas.addEventListener('mouseleave', () => {
-      chartHoverX = null;
-      drawChart();
-    });
-  }
+  initLightweightChart();
+  window.addEventListener('resize', () => {
+    const container = document.getElementById('priceChartContainer');
+    if (chart && container) {
+      chart.applyOptions({
+        width: container.clientWidth,
+        height: container.clientHeight,
+      });
+    }
+  });
 
-  window.addEventListener('resize', () => drawChart());
+  // Mode Switcher buttons
+  document.querySelectorAll('.chart-mode-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.mode;
+      if (mode) setChartMode(mode);
+    });
+  });
 
   document.getElementById('btnEditStrike').addEventListener('click', async () => {
     const cur = appState.market ? appState.market.strikePrice : 84150;
@@ -637,11 +758,14 @@ window.addEventListener('DOMContentLoaded', () => {
     appState.signal = data.signal;
     if (data.sdkAuth) appState.sdkAuth = data.sdkAuth;
     if (data.polymarket5mPrice) appState.polymarket5mPrice = data.polymarket5mPrice;
+    if (Array.isArray(data.windowHistory)) appState.windowHistory = data.windowHistory;
     if (data.chartPoint) {
       const last = appState.chartSeries[appState.chartSeries.length - 1];
       if (!last || data.chartPoint.t - last.t >= 850) {
         appState.chartSeries.push(data.chartPoint);
-        if (appState.chartSeries.length > 240) appState.chartSeries.shift();
+        if (appState.chartSeries.length > 1800) {
+          appState.chartSeries.splice(0, appState.chartSeries.length - 1800);
+        }
       } else {
         appState.chartSeries[appState.chartSeries.length - 1] = data.chartPoint;
       }

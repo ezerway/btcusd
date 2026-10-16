@@ -1,498 +1,88 @@
+/* Dynamic State and Component Styles for BTC 5M Terminal */
 :root {
-  --bg: #0b0f17;
-  --panel: #131a27;
-  --card: #1a2333;
-  --border: #28354d;
-
-  --text: #f8fafc;
-  --muted: #94a3b8;
-
-  --up: #10b981;
-  --down: #f43f5e;
-  --cyan: #06b6d4;
-  --amber: #f59e0b;
-  --purple: #a855f7;
-
-  --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
-  --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--sans);
-  font-size: 14px;
-  line-height: 1.4;
-  font-variant-numeric: tabular-nums;
-}
-
-.container {
-  max-width: 1220px;
-  margin: 0 auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* Header */
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 16px;
-  gap: 12px;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.logo {
-  background: #2563eb;
-  color: #fff;
-  font-family: var(--mono);
-  font-weight: 800;
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 13px;
-}
-
-.brand h1 {
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.sdk-badge {
-  font-family: var(--mono);
-  font-size: 11.5px;
-  color: var(--amber);
-  background: var(--card);
-  border: 1px solid var(--border);
-  padding: 4px 10px;
-  border-radius: 6px;
-}
-
-.sdk-badge.authed {
-  color: var(--up);
-}
-
-.btn-outline,
-.btn-tiny {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 11.5px;
-  cursor: pointer;
-}
-
-.btn-outline:hover,
-.btn-tiny:hover {
-  color: #fff;
-  border-color: var(--cyan);
-}
-
-/* Signal + Odds Row */
-.signal-row {
-  display: grid;
-  grid-template-columns: 1.35fr 1fr;
-  gap: 12px;
-}
-
-.signal-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--panel);
-  border: 2px solid var(--border);
-  border-radius: 10px;
-  padding: 14px 18px;
-  gap: 16px;
-}
-
+/* Dynamic State Classes */
 .signal-banner.buy-up {
-  border-color: var(--up);
-  background: linear-gradient(90deg, rgba(16, 185, 129, 0.14), var(--panel));
+  border-color: #10b981 !important;
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.16), #131a27) !important;
 }
 
 .signal-banner.buy-down {
-  border-color: var(--down);
-  background: linear-gradient(90deg, rgba(244, 63, 94, 0.14), var(--panel));
-}
-
-.signal-tag {
-  display: inline-block;
-  font-family: var(--mono);
-  font-size: 10.5px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 4px;
-  background: var(--card);
-  color: var(--cyan);
-  margin-bottom: 3px;
-}
-
-.signal-left h2 {
-  font-size: 20px;
-  font-weight: 800;
-}
-
-.signal-left p {
-  font-size: 12.5px;
-  color: var(--muted);
-  margin-top: 2px;
-}
-
-.signal-stat {
-  text-align: right;
-}
-
-.signal-stat span {
-  display: block;
-  font-size: 10px;
-  color: var(--muted);
-  letter-spacing: 0.5px;
-}
-
-.signal-stat strong {
-  font-family: var(--mono);
-  font-size: 22px;
-}
-
-.odds-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.odds-card {
-  border-radius: 10px;
-  padding: 12px 16px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  border-color: #f43f5e !important;
+  background: linear-gradient(90deg, rgba(244, 63, 94, 0.16), #131a27) !important;
 }
 
 .odds-card.up {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.24), rgba(16, 185, 129, 0.08));
-  border: 1px solid rgba(16, 185, 129, 0.5);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(16, 185, 129, 0.05));
+  border-color: rgba(16, 185, 129, 0.45);
 }
 
 .odds-card.down {
-  background: linear-gradient(135deg, rgba(244, 63, 94, 0.24), rgba(244, 63, 94, 0.08));
-  border: 1px solid rgba(244, 63, 94, 0.5);
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.18), rgba(244, 63, 94, 0.05));
+  border-color: rgba(244, 63, 94, 0.45);
 }
 
 .odds-card.active-up {
-  border: 2px solid var(--up);
-  box-shadow: 0 0 18px rgba(16, 185, 129, 0.25);
+  border-color: #10b981 !important;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.35);
 }
 
 .odds-card.active-down {
-  border: 2px solid var(--down);
-  box-shadow: 0 0 18px rgba(244, 63, 94, 0.25);
+  border-color: #f43f5e !important;
+  box-shadow: 0 0 20px rgba(244, 63, 94, 0.35);
 }
 
-.odds-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.odds-card.up .odds-header strong { color: #34d399; }
-.odds-card.down .odds-header strong { color: #fb7185; }
-
-.edge-badge {
-  font-family: var(--mono);
-  font-size: 11px;
-  padding: 2px 7px;
-  border-radius: 4px;
-  background: rgba(11, 15, 23, 0.65);
-}
-
-.odds-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-}
-
-.odds-row small {
-  display: block;
-  font-size: 10.5px;
-  color: rgba(248, 250, 252, 0.72);
-  margin-bottom: 1px;
-}
-
-.ask-price {
-  font-family: var(--mono);
-  font-size: 27px;
-  font-weight: 800;
-  line-height: 1.05;
-  color: #ffffff;
-}
-
-.model-col {
-  text-align: right;
-}
-
-.model-prob {
-  font-family: var(--mono);
-  font-size: 15px;
-  font-weight: 700;
-  color: rgba(248, 250, 252, 0.88);
-}
-
-/* Price to Beat + 3 Current Prices + Countdown */
-.price-cards {
-  display: grid;
-  grid-template-columns: 0.85fr 3.15fr;
-  gap: 12px;
-}
-
-.card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 13px 15px;
-}
-
-.strike-card {
-  border-left: 4px solid var(--purple);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.current-prices-card {
-  border-left: 4px solid var(--amber);
-}
-
-.current-prices-grid {
-  display: grid;
-  grid-template-columns: 1.05fr 1fr 1.05fr 0.82fr;
-  gap: 14px;
-  align-items: center;
-}
-
-.current-price-block {
-  padding-right: 12px;
-  border-right: 1px solid rgba(40, 53, 77, 0.7);
-}
-
-.current-countdown-block {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--muted);
-  margin-bottom: 4px;
-  gap: 6px;
-}
-
-.big-price {
-  font-family: var(--mono);
-  font-size: 23px;
-  font-weight: 800;
-  margin-bottom: 3px;
-  letter-spacing: -0.5px;
-}
-
-.purple-text { color: #d8b4fe; }
-.amber-text { color: #fcd34d; }
-.blue-text { color: #60a5fa; }
-.cyan-text { color: #67e8f9; }
-
-.countdown-price {
-  font-family: var(--mono);
-  font-size: 24px;
-  font-weight: 800;
-  color: #fff;
-  margin-bottom: 6px;
-  letter-spacing: 0.5px;
+.sdk-badge.authed {
+  color: #10b981 !important;
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  background: rgba(16, 185, 129, 0.1) !important;
 }
 
 .countdown-price.urgent {
-  color: var(--down);
-}
-
-.countdown-bar-track {
-  width: 100%;
-  height: 6px;
-  background: var(--card);
-  border-radius: 999px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.countdown-bar-fill {
-  height: 100%;
-  width: 100%;
-  background: linear-gradient(90deg, var(--cyan), var(--up));
-  transition: width 0.25s linear;
+  color: #f43f5e !important;
 }
 
 .countdown-bar-fill.urgent {
-  background: var(--down);
+  background: #f43f5e !important;
 }
 
-.card-sub {
-  font-size: 11px;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.pos { color: #10b981 !important; }
+.neg { color: #f43f5e !important; }
+.neutral { color: #94a3b8 !important; }
 
-.card-sub strong {
-  font-family: var(--mono);
-  color: var(--text);
-}
-
-.sep {
-  margin: 0 4px;
-  opacity: 0.4;
-}
-
-.pill {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--card);
-  white-space: nowrap;
-}
-
-/* Full-Width Chart Panel */
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px 16px;
-}
-
-.panel-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.panel h3 {
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.chart-subtitle {
-  font-size: 11.5px;
-  color: var(--muted);
-  margin-top: 2px;
-  font-family: var(--mono);
-}
-
-.legend {
-  display: flex;
-  gap: 14px;
-  font-size: 11.5px;
-  color: var(--muted);
-  align-items: center;
-}
-
-.legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.dot-cyan,
-.dot-blue,
-.dot-amber,
-.dot-purple {
-  display: inline-block;
-  width: 10px;
-  height: 3px;
-}
-
-.dot-cyan { background: var(--cyan); }
-.dot-blue { background: #3b82f6; }
-.dot-amber { background: var(--amber); }
-.dot-purple { background: var(--purple); }
-
-.chart-box {
-  background: #080b11;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  height: 360px;
-  overflow: hidden;
-  position: relative;
-}
-
-#priceChartCanvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-  cursor: crosshair;
-}
-
-.pos { color: var(--up) !important; }
-.neg { color: var(--down) !important; }
-.neutral { color: var(--muted); }
-
-/* Popover Toast Stack per modern-web-guidance */
+/* Toast Notifications */
 .toast-stack {
   position: fixed;
-  bottom: 16px;
-  right: 16px;
+  bottom: calc(16px + var(--sab));
+  right: calc(16px + var(--sar));
   z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
 }
 
 .toast-item[popover] {
-  position: fixed;
-  inset: auto 18px 18px auto;
+  position: static;
   margin: 0;
-  width: 320px;
-  background: var(--card);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--cyan);
+  width: min(340px, calc(100vw - 32px));
+  background: #1a2333;
+  color: #f8fafc;
+  border: 1px solid #28354d;
+  border-left: 4px solid #06b6d4;
   border-radius: 8px;
-  padding: 10px 12px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  padding: 10px 14px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
   opacity: 0;
   transform: translateY(8px);
   transition: opacity 0.2s ease, transform 0.2s ease, display 0.2s ease allow-discrete;
   transition-behavior: allow-discrete;
-  bottom: calc(18px + (sibling-index() - 1) * 70px);
+  pointer-events: auto;
 }
 
 .toast-item[popover]:is(:popover-open, .\:popover-open) {
@@ -501,129 +91,39 @@ body {
   transform: translateY(0);
 }
 
-.toast-item[popover] + .toast-item[popover] {
-  margin-top: 0.75rem;
-}
-
 .toast-top {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   font-weight: 700;
   font-size: 12px;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 
 .toast-close {
   background: none;
   border: none;
-  color: var(--muted);
+  color: #94a3b8;
   cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 6px;
 }
 
 .toast-msg {
-  font-size: 11px;
-  color: var(--muted);
+  font-size: 11.5px;
+  color: #94a3b8;
+  line-height: 1.35;
 }
 
-/* Auth Dialog */
-.auth-dialog {
-  margin: auto;
-  background: var(--panel);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  width: min(440px, 92vw);
-  padding: 0;
-}
-
-.auth-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.7);
-}
-
-.dialog-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.dialog-head h3 {
-  font-size: 14px;
-}
-
-.btn-close {
-  background: none;
-  border: none;
-  color: var(--muted);
-  font-size: 18px;
-  cursor: pointer;
-}
-
-.dialog-body {
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.dialog-note {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.field label {
-  font-size: 11px;
-  color: var(--muted);
-  font-family: var(--mono);
-}
-
-.field input {
-  background: var(--card);
-  border: 1px solid var(--border);
-  color: #fff;
-  padding: 8px 10px;
-  border-radius: 6px;
-  font-family: var(--mono);
-  font-size: 12px;
-}
-
-.dialog-foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--border);
-}
-
-.btn-save {
-  background: #2563eb;
-  border: none;
-  color: #fff;
-  padding: 6px 14px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-@media (max-width: 980px) {
-  .signal-row,
-  .price-cards,
-  .current-prices-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 560px) {
+  .toast-stack {
+    left: calc(14px + var(--sal));
+    right: calc(14px + var(--sar));
+    bottom: calc(14px + var(--sab));
   }
 
-  .current-price-block {
-    padding-right: 0;
-    border-right: none;
-    border-bottom: 1px solid rgba(40, 53, 77, 0.7);
-    padding-bottom: 10px;
+  .toast-item[popover] {
+    width: 100%;
   }
 }

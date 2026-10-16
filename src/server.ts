@@ -39,8 +39,8 @@ polymarket.on('window_settled', (settlement) => {
 });
 
 polymarket.on('window_started', () => {
-  // Keep only recent points (last 30s lead-in) when a new 5m window starts so the chart focuses on the active 5m round
-  const cutoff = polymarketSdk.getServerNowMs() - 30_000;
+  // Retain up to 30 minutes of historical ticks so the chart can draw previous milestones
+  const cutoff = polymarketSdk.getServerNowMs() - 30 * 60 * 1000;
   while (chartSeries.length > 0 && chartSeries[0].t < cutoff) {
     chartSeries.shift();
   }
@@ -94,9 +94,9 @@ setInterval(() => {
 
   if (hasLivePrice && now - lastChartPointTs >= 900) {
     lastChartPointTs = now;
-    // Purge any stale startup points that had a wildly different fallback price
+    // Purge any stale startup points that had a wildly different fallback price (e.g. test dummy 67k)
     for (let i = chartSeries.length - 1; i >= 0; i--) {
-      if (Math.abs(chartSeries[i].oracle - signal.chainlinkPrice) > 1500) {
+      if (Math.abs(chartSeries[i].oracle - signal.chainlinkPrice) > 10000) {
         chartSeries.splice(i, 1);
       }
     }
@@ -108,8 +108,8 @@ setInterval(() => {
       strike: market.strikePrice,
       upAsk: market.upBook.bestAsk,
     });
-    if (chartSeries.length > 320) {
-      chartSeries.splice(0, chartSeries.length - 320);
+    if (chartSeries.length > 1800) {
+      chartSeries.splice(0, chartSeries.length - 1800);
     }
   }
 
@@ -118,6 +118,7 @@ setInterval(() => {
     signal,
     stats: executionEngine.getPerformanceStats(),
     positions: executionEngine.positions,
+    windowHistory: executionEngine.windowHistory.slice(0, 25),
     feedStatus: priceFeeds.feedStatus,
     clobStatus: polymarket.clobStatus,
     sdkAuth: polymarketSdk.authStatus,
@@ -334,7 +335,10 @@ const server = http.createServer(async (req, res) => {
   if (fs.existsSync(absPath) && fs.statSync(absPath).isFile()) {
     const ext = path.extname(absPath);
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': contentType });
+    res.writeHead(200, {
+      'Content-Type': contentType,
+      'Cache-Control': 'no-cache, must-revalidate',
+    });
     fs.createReadStream(absPath).pipe(res);
   } else {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
