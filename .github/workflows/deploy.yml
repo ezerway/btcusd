@@ -37,18 +37,10 @@ jobs:
             exit 1
           fi
 
-      - name: Setup SSH
-        env:
-          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
-          chmod 644 ~/.ssh/known_hosts
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Deploy files via rsync
         env:
@@ -59,7 +51,7 @@ jobs:
         run: |
           echo "Starting rsync to ${SSH_USER}@${SSH_HOST}:${TARGET_DIR}..."
           rsync -avz --delete \
-            -e "ssh -p ${SSH_PORT} -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+            -e "ssh -p ${SSH_PORT} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
             --rsync-path="mkdir -p ${TARGET_DIR} && rsync" \
             --exclude='.git/' \
             --exclude='.github/' \
@@ -79,7 +71,7 @@ jobs:
           TARGET_DIR: ${{ secrets.TARGET_DIR }}
           APP_NAME: ${{ secrets.PM2_APP_NAME || 'btcusd' }}
         run: |
-          ssh -p "${SSH_PORT}" -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${SSH_HOST}" "bash -lc '
+          ssh -p "${SSH_PORT}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${SSH_HOST}" "bash -lc '
             set -e
             cd \"${TARGET_DIR}\"
             mkdir -p data
