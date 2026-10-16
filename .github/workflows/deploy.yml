@@ -19,28 +19,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Validate Secrets
+      - name: Setup SSH
         env:
           SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          TARGET_DIR: ${{ secrets.TARGET_DIR }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
         run: |
-          missing=""
-          [ -z "$SSH_KEY" ] && missing="${missing} SSH_PRIVATE_KEY"
-          [ -z "$SSH_HOST" ] && missing="${missing} SSH_HOST"
-          [ -z "$SSH_USER" ] && missing="${missing} SSH_USER"
-          [ -z "$TARGET_DIR" ] && missing="${missing} TARGET_DIR"
-          if [ -n "$missing" ]; then
-            echo "::error::Missing required secret(s):$missing"
-            echo "Please configure them in GitHub Repo Settings -> Secrets and variables -> Actions"
-            exit 1
-          fi
-
-      - name: Setup SSH Agent
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 644 ~/.ssh/known_hosts
 
       - name: Deploy files via rsync
         env:
@@ -51,8 +41,7 @@ jobs:
         run: |
           echo "Starting rsync to ${SSH_USER}@${SSH_HOST}:${TARGET_DIR}..."
           rsync -avz --delete \
-            -e "ssh -p ${SSH_PORT} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
-            --rsync-path="mkdir -p ${TARGET_DIR} && rsync" \
+            -e "ssh -p ${SSH_PORT} -i ~/.ssh/id_rsa" \
             --exclude='.git/' \
             --exclude='.github/' \
             --exclude='node_modules/' \
@@ -71,34 +60,22 @@ jobs:
           TARGET_DIR: ${{ secrets.TARGET_DIR }}
           APP_NAME: ${{ secrets.PM2_APP_NAME || 'btcusd' }}
         run: |
-          ssh -p "${SSH_PORT}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${SSH_HOST}" "bash -lc '
+          ssh -p "${SSH_PORT}" -i ~/.ssh/id_rsa "${SSH_USER}@${SSH_HOST}" "bash -lc '
             set -e
             cd \"${TARGET_DIR}\"
             mkdir -p data
 
-            # Source user environments (nvm, pnpm, local bin) if available
-            [ -s \"\$HOME/.nvm/nvm.sh\" ] && . \"\$HOME/.nvm/nvm.sh\"
-            [ -s \"\$HOME/.bashrc\" ] && . \"\$HOME/.bashrc\"
-            export PATH=\"\$HOME/.local/share/pnpm:\$HOME/.nvm/versions/node/\$(nvm current 2>/dev/null)/bin:\$PATH\"
-
             echo \"Installing dependencies...\"
             if command -v pnpm &> /dev/null; then
-              pnpm install --prod
+              pnpm install --frozen-lockfile --prod
             elif command -v npm &> /dev/null; then
               npm install --omit=dev
-            else
-              echo \"::warning::Neither pnpm nor npm found in PATH\"
             fi
 
             echo \"Restarting application...\"
             if command -v pm2 &> /dev/null; then
               pm2 restart \"${APP_NAME}\" || pm2 reload \"${APP_NAME}\" || pm2 start npm --name \"${APP_NAME}\" -- start
               pm2 save
-            elif [ -f \"/etc/systemd/system/${APP_NAME}.service\" ]; then
-              sudo systemctl restart \"${APP_NAME}\" || true
-            else
-              echo \"Note: PM2 or systemd not detected. If using CloudPanel UI to manage the Node process, it will reload on file change or restart via CloudPanel dashboard.\"
             fi
-
             echo \"Deployment complete!\"
           '"
