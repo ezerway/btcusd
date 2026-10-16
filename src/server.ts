@@ -191,6 +191,8 @@ const MIME_TYPES: Record<string, string> = {
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.ico': 'image/x-icon',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
 };
 
 const server = http.createServer(async (req, res) => {
@@ -341,10 +343,15 @@ const server = http.createServer(async (req, res) => {
       ? 'public, max-age=31536000, immutable'
       : 'no-cache, no-store, must-revalidate';
 
-    res.writeHead(200, {
+    const headers: Record<string, string> = {
       'Content-Type': contentType,
       'Cache-Control': cacheControl,
-    });
+    };
+    if (safePath === 'sw.js' || safePath === '/sw.js') {
+      headers['Service-Worker-Allowed'] = '/';
+    }
+
+    res.writeHead(200, headers);
     fs.createReadStream(absPath).pipe(res);
   } else {
     res.writeHead(404, { 'Content-Type': 'text/plain' });

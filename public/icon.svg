@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#131a27" />
+      <stop offset="50%" stop-color="#0b0f17" />
+      <stop offset="100%" stop-color="#06090e" />
+    </linearGradient>
+    <linearGradient id="btcGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+    <linearGradient id="upGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+    <linearGradient id="downGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#e11d48" />
+      <stop offset="100%" stop-color="#f43f5e" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background rounded squircle -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  <rect x="6" y="6" width="500" height="500" rx="106" fill="none" stroke="#28354d" stroke-width="6" opacity="0.8" />
+
+  <!-- Ambient Glow Circles -->
+  <circle cx="160" cy="180" r="140" fill="#f59e0b" opacity="0.12" filter="url(#glow)" />
+  <circle cx="360" cy="340" r="130" fill="#06b6d4" opacity="0.12" filter="url(#glow)" />
+
+  <!-- Dynamic Trend Lines in Background -->
+  <path d="M 60 380 Q 180 320, 256 350 T 452 170" fill="none" stroke="#10b981" stroke-width="4" stroke-dasharray="8 6" opacity="0.35" />
+  <path d="M 60 410 Q 200 370, 270 400 T 452 230" fill="none" stroke="#f43f5e" stroke-width="3" stroke-dasharray="6 6" opacity="0.25" />
+
+  <!-- Center Bitcoin Symbol Circle -->
+  <circle cx="210" cy="235" r="120" fill="url(#btcGrad)" filter="url(#glow)" />
+  <circle cx="210" cy="235" r="108" fill="#0b0f17" />
+
+  <!-- BTC '₿' Graphic -->
+  <text x="210" y="278" font-family="'Inter', 'JetBrains Mono', 'Segoe UI', system-ui, sans-serif" font-weight="900" font-size="140" fill="url(#btcGrad)" text-anchor="middle">₿</text>
+
+  <!-- 5M Badge -->
+  <g transform="translate(310, 260)">
+    <rect width="142" height="88" rx="22" fill="url(#cyanGrad)" filter="url(#glow)" />
+    <rect x="2" y="2" width="138" height="84" rx="20" fill="#0b0f17" opacity="0.2" />
+    <text x="71" y="60" font-family="'JetBrains Mono', 'Inter', monospace" font-weight="900" font-size="52" fill="#ffffff" text-anchor="middle" letter-spacing="1">5M</text>
+  </g>
+
+  <!-- UP / DOWN Signal Indicators -->
+  <g transform="translate(100, 395)">
+    <!-- UP Arrow Tag -->
+    <rect x="0" y="0" width="140" height="48" rx="12" fill="#064e3b" stroke="#10b981" stroke-width="2.5" />
+    <path d="M 28 32 L 40 16 L 52 32 Z" fill="#10b981" />
+    <text x="92" y="32" font-family="'JetBrains Mono', monospace" font-weight="800" font-size="22" fill="#10b981" text-anchor="middle">UP</text>
+  </g>
+
+  <g transform="translate(272, 395)">
+    <!-- DOWN Arrow Tag -->
+    <rect x="0" y="0" width="140" height="48" rx="12" fill="#4c0519" stroke="#f43f5e" stroke-width="2.5" />
+    <path d="M 28 16 L 40 32 L 52 16 Z" fill="#f43f5e" />
+    <text x="92" y="32" font-family="'JetBrains Mono', monospace" font-weight="800" font-size="22" fill="#f43f5e" text-anchor="middle">DOWN</text>
+  </g>
+</svg>
