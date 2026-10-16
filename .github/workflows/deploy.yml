@@ -1,0 +1,81 @@
+name: Deploy to CloudPanel
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-cloudpanel
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Sync to CloudPanel via Rsync
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Deploy files via rsync
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+          TARGET_DIR: ${{ secrets.TARGET_DIR }}
+        run: |
+          echo "Starting rsync to ${SSH_USER}@${SSH_HOST}:${TARGET_DIR}..."
+          rsync -avz --delete \
+            -e "ssh -p ${SSH_PORT} -i ~/.ssh/id_rsa" \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='node_modules/' \
+            --exclude='.pnpm-store/' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='data/*.json' \
+            --exclude='.DS_Store' \
+            ./ "${SSH_USER}@${SSH_HOST}:${TARGET_DIR}/"
+
+      - name: Install dependencies & reload on server
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+          TARGET_DIR: ${{ secrets.TARGET_DIR }}
+          APP_NAME: ${{ secrets.PM2_APP_NAME || 'btcusd' }}
+        run: |
+          ssh -p "${SSH_PORT}" -i ~/.ssh/id_rsa "${SSH_USER}@${SSH_HOST}" "bash -lc '
+            set -e
+            cd \"${TARGET_DIR}\"
+            mkdir -p data
+
+            echo \"Installing dependencies...\"
+            if command -v pnpm &> /dev/null; then
+              pnpm install --frozen-lockfile --prod
+            elif command -v npm &> /dev/null; then
+              npm install --omit=dev
+            fi
+
+            echo \"Restarting application...\"
+            if command -v pm2 &> /dev/null; then
+              pm2 restart \"${APP_NAME}\" || pm2 reload \"${APP_NAME}\" || pm2 start npm --name \"${APP_NAME}\" -- start
+              pm2 save
+            fi
+            echo \"Deployment complete!\"
+          '"
