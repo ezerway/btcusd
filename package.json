@@ -1,0 +1,17 @@
+{
+  "name": "polymarket-btc-5m-quant",
+  "version": "1.0.0",
+  "description": "Real-time Lead-Lag Oracle Arbitrage, Fair-Value Probability Engine & Auto-Trader for Polymarket BTC Up or Down 5m Markets",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/server.ts",
+    "dev": "node --watch --env-file-if-exists=.env src/server.ts"
+  },
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "dependencies": {
+    "@polymarket/clob-client": "^5.8.1",
+    "@polymarket/real-time-data-client": "^1.4.0"
+  }
+}

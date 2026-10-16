@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BTC 5m Up/Down — Live Signal &amp; Price Monitor</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script type="module">
+    if (!("popover" in HTMLElement.prototype)) {
+      import("https://unpkg.com/@oddbird/popover-polyfill@latest/dist/popover.min.js").catch(() => {});
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <!-- Minimal Header -->
+    <header class="header">
+      <div class="brand">
+        <span class="logo">BTC 5M</span>
+        <div>
+          <h1 id="marketQuestion">Bitcoin Up or Down — 5m Window</h1>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <span id="sdkAuthBadge" class="sdk-badge">SDK CONNECTED</span>
+        <button type="button" class="btn-outline" id="btnOpenAuthModal">SDK Auth</button>
+      </div>
+    </header>
+
+    <!-- Signal + Fair Odds Row -->
+    <section class="signal-row">
+      <div class="signal-banner" id="signalBanner">
+        <div class="signal-left">
+          <span class="signal-tag" id="regimeBadge">SCANNING</span>
+          <h2 id="signalActionVal">WAIT</h2>
+          <p id="signalReasonText">Waiting for live price feeds...</p>
+        </div>
+        <div class="signal-stat">
+          <span>CONFIDENCE</span>
+          <strong id="confidenceVal">0%</strong>
+        </div>
+      </div>
+
+      <div class="odds-grid">
+        <div class="odds-card up" id="upCard">
+          <div class="odds-header">
+            <strong>UP</strong>
+            <span class="edge-badge" id="edgeUpVal">Edge 0.0%</span>
+          </div>
+          <div class="odds-row">
+            <div class="ask-col">
+              <small>Poly Ask</small>
+              <strong class="ask-price" id="marketAskUpVal">51.0¢</strong>
+            </div>
+            <div class="model-col">
+              <small>Model</small>
+              <strong class="model-prob" id="fairProbUpVal">50.0%</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="odds-card down" id="downCard">
+          <div class="odds-header">
+            <strong>DOWN</strong>
+            <span class="edge-badge" id="edgeDownVal">Edge 0.0%</span>
+          </div>
+          <div class="odds-row">
+            <div class="ask-col">
+              <small>Poly Ask</small>
+              <strong class="ask-price" id="marketAskDownVal">51.0¢</strong>
+            </div>
+            <div class="model-col">
+              <small>Model</small>
+              <strong class="model-prob" id="fairProbDownVal">50.0%</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Price to Beat + 3 Current Prices + Countdown -->
+    <section class="price-cards">
+      <div class="card strike-card">
+        <div class="card-top">
+          <span>PRICE TO BEAT</span>
+          <button type="button" class="btn-tiny" id="btnEditStrike">Edit</button>
+        </div>
+        <div class="big-price purple-text" id="strikePriceVal">$--,---.--</div>
+        <div class="card-sub" id="strikeSourceSub">Polymarket 5m Open</div>
+      </div>
+
+      <div class="card current-prices-card">
+        <div class="current-prices-grid">
+          <!-- 1. Chainlink -->
+          <div class="current-price-block">
+            <div class="card-top">
+              <span>#1 CHAINLINK</span>
+              <span class="pill" id="distanceBadge">$0.00</span>
+            </div>
+            <div class="big-price amber-text" id="chainlinkPriceVal">$--,---.--</div>
+            <div class="card-sub">
+              TWAP: <strong id="twap60sVal">$--,---.--</strong>
+              <span class="sep">·</span>
+              Est: <strong id="projectedOracleVal">$--,---.--</strong>
+            </div>
+          </div>
+
+          <!-- 2. Polymarket Spot -->
+          <div class="current-price-block">
+            <div class="card-top">
+              <span>#2 POLY SPOT</span>
+              <span class="pill" id="polySpotDistBadge">$0.00</span>
+            </div>
+            <div class="big-price blue-text" id="polySpotPriceVal">$--,---.--</div>
+          </div>
+
+          <!-- 3. Fast Exchange -->
+          <div class="current-price-block">
+            <div class="card-top">
+              <span>#3 FAST EXCH</span>
+              <span class="pill" id="fastDistBadge">$0.00</span>
+            </div>
+            <div class="big-price cyan-text" id="fastMidPriceVal">$--,---.--</div>
+          </div>
+
+          <!-- 5m Countdown -->
+          <div class="current-countdown-block">
+            <div class="card-top">
+              <span>COUNTDOWN</span>
+              <span class="pill" id="liveWinningBadge">TIED</span>
+            </div>
+            <div class="countdown-price" id="timeRemaining">04:59.0</div>
+            <div class="countdown-bar-track">
+              <div class="countdown-bar-fill" id="countdownBarFill"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Full-Width Live 5m Chart -->
+    <section class="panel chart-panel">
+      <div class="panel-head">
+        <div>
+          <h3>5m Price Chart</h3>
+          <p class="chart-subtitle" id="chartSummarySub">Waiting for live ticks...</p>
+        </div>
+        <div class="legend">
+          <span><i class="dot-amber"></i>#1 Chainlink</span>
+          <span><i class="dot-blue"></i>#2 Poly Spot</span>
+          <span><i class="dot-cyan"></i>#3 Fast Exch</span>
+          <span><i class="dot-purple"></i>Price to Beat</span>
+        </div>
+      </div>
+      <div class="chart-box">
+        <canvas id="priceChartCanvas" width="1160" height="360"></canvas>
+      </div>
+    </section>
+  </div>
+
+  <!-- Polymarket SDK Auth Dialog -->
+  <dialog id="authDialog" class="auth-dialog">
+    <form id="authForm" method="dialog">
+      <div class="dialog-head">
+        <h3>Polymarket SDK Auth</h3>
+        <button type="button" class="btn-close" id="btnCloseAuthModal">&times;</button>
+      </div>
+      <div class="dialog-body">
+        <p class="dialog-note" id="sdkStatusDetail">
+          Optional: Enter Polymarket CLOB credentials or Polygon Private Key.
+        </p>
+        <div class="field">
+          <label for="inputApiKey">API KEY</label>
+          <input type="text" id="inputApiKey" placeholder="UUID API Key" />
+        </div>
+        <div class="field">
+          <label for="inputSecret">SECRET</label>
+          <input type="password" id="inputSecret" placeholder="Base64 Secret" />
+        </div>
+        <div class="field">
+          <label for="inputPassphrase">PASSPHRASE</label>
+          <input type="password" id="inputPassphrase" placeholder="Passphrase" />
+        </div>
+        <div class="field">
+          <label for="inputPrivateKey">PRIVATE KEY (OPTIONAL)</label>
+          <input type="password" id="inputPrivateKey" placeholder="0x..." />
+        </div>
+      </div>
+      <div class="dialog-foot">
+        <button type="button" class="btn-outline" id="btnCancelAuth">Cancel</button>
+        <button type="submit" class="btn-save">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toastContainer" class="toast-stack" aria-live="polite"></div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
